@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: support_queue_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+
+  main-service:
+    image: main-service:latest
+    build:
+      context: SupportQueueService
+      dockerfile: Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    container_name: main-service
+    ports:
+      - "8080:8080"
+      
+  grpc-backend-service:
+    image: grpc-backend-service:latest
+    build:
+      context: GrpcBackend
+      dockerfile: Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    container_name: grpc-backend-service
+    ports:
+      - "8081:8081"
+      
+  grpc-client-service:
+    image: grpc-client-service:latest
+    build:
+      context: GrpcClient
+      dockerfile: Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    container_name: grpc-client-service
+    ports:
+      - "8082:8082"
+      
+  notifier:
+    image: notifier:latest
+    build:
+      context: Consumer
+      dockerfile: Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    container_name: notifier
+    ports:
+      - "8083:8083"
+      
+  remote-client:
+    image: remote-client:latest
+    build:
+      context: RemoteClient
+      dockerfile: Dockerfile
+    container_name: remote-client
+    ports:
+      - "8000:8000"
