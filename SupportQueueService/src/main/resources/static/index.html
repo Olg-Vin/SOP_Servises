@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Notifications</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body>
+<!-- Уведомления -->
+<div id="notifications"></div>
+
+<!-- Форма для отправки сообщения -->
+<h2>Send a Message</h2>
+<form id="messageForm">
+    <label for="userID">User ID:</label>
+    <input type="text" id="userID" name="userID" required><br><br>
+
+    <label for="subject">Subject:</label>
+    <input type="text" id="subject" name="subject" required><br><br>
+
+    <label for="body">Body:</label>
+    <textarea id="body" name="body" required></textarea><br><br>
+
+    <button type="submit">Send</button>
+</form>
+
+<script>
+    // WebSocket: Подключение и подписка
+    var socket = new SockJS('http://localhost:8082/ws');
+    var stompClient = Stomp.over(socket);
+    stompClient.connect({}, function (frame) {
+        stompClient.subscribe('/topic/notifications', function (notification) {
+            var notifications = document.getElementById('notifications');
+            var message = document.createElement('p');
+            message.appendChild(document.createTextNode(notification.body));
+            notifications.appendChild(message);
+        });
+    });
+
+    // Отправка формы через POST-запрос
+    var form = document.getElementById('messageForm');
+    form.addEventListener('submit', function (event) {
+        event.preventDefault(); // Предотвратить стандартное поведение формы
+
+        // Собрать данные из формы
+        var formData = {
+            userID: Number(document.getElementById('userID').value),
+            subject: document.getElementById('subject').value,
+            body: document.getElementById('body').value
+        };
+
+        const bodyFormatted = JSON.stringify(formData)
+
+        console.log(bodyFormatted)
+
+        // Выполнить POST-запрос
+        fetch('http://localhost:8080/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: bodyFormatted
+        })
+            .then(response => {
+                if (response.status === 201) {
+                    alert('Message sent successfully!');
+                    form.reset();
+                } else {
+                    alert('Failed to send message.');
+                }
+            })
+            .catch(error => {
+                console.error('Error sending message:', error);
+                alert('Error sending message.');
+            });
+    });
+</script>
+</body>
+</html>
